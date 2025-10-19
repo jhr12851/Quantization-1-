@@ -1,0 +1,6 @@
+pandas>=1.5
+numpy>=1.23
+yfinance>=0.2
+akshare>=1.17
+Flask>=3.0
+requests>=2.31

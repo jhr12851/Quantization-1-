@@ -1,0 +1,236 @@
+:root {
+  color-scheme: light;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bg: #f5f7fb;
+  --panel: #ffffff;
+  --border: #d9dfeb;
+  --text: #1f2933;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-light: rgba(37, 99, 235, 0.08);
+  --danger: #dc2626;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  padding: 2.5rem 1.5rem 1.5rem;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), transparent);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+header p {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 35px rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border);
+}
+
+.panel > h2,
+.panel > h3 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+
+form .grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 0.55rem 0.75rem;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+  outline: none;
+}
+
+.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.actions {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+button[type="submit"] {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  padding: 0.65rem 1.5rem;
+  font-weight: 600;
+}
+
+button[type="submit"]:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.status {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.metrics-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.metric-item {
+  background: var(--accent-light);
+  padding: 1rem;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.metric-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  position: relative;
+  height: 360px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chart-card.chart-focused {
+  box-shadow: 0 0 0 3px var(--accent-light), 0 16px 36px rgba(37, 99, 235, 0.15);
+}
+
+.chart-card canvas {
+  flex: 1;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+}
+
+#tail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+#tail-table th,
+#tail-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+#tail-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-pagination {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.table-pagination button {
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.2s ease, border 0.2s ease;
+}
+
+.table-pagination button:disabled {
+  cursor: not-allowed;
+  background: #edf2f8;
+  color: var(--muted);
+}
+
+.table-pagination button:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: 2rem 1rem 1rem;
+  }
+
+  main {
+    padding: 1rem;
+  }
+}

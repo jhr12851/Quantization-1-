@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>量化回测面板</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="vendor/chart.umd.min.js"></script>
+    <script src="vendor/hammer.min.js"></script>
+    <script src="vendor/chartjs-chart-financial.min.js"></script>
+    <script src="vendor/chartjs-plugin-zoom.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>移动均线策略回测面板</h1>
+      <p>选择标的与参数，查看策略绩效与收益曲线。</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>参数配置</h2>
+        <form id="backtest-form">
+          <div class="grid">
+            <label>
+              标的代码
+              <input type="text" name="ticker" value="000981" required />
+            </label>
+            <label>
+              开始日期
+              <input type="date" name="start" value="2020-01-01" required />
+            </label>
+            <label>
+              结束日期
+              <input type="date" name="end" value="2024-01-01" required />
+            </label>
+            <label>
+              短均线窗口
+              <input type="number" name="shortWindow" value="20" min="1" required />
+            </label>
+            <label>
+              长均线窗口
+              <input type="number" name="longWindow" value="100" min="2" required />
+            </label>
+            <label>
+              初始资金
+              <input type="number" name="capital" value="100000" step="1000" min="0" required />
+            </label>
+            <label>
+              交易成本 (bps)
+              <input type="number" name="costBps" value="5" step="0.5" min="0" />
+            </label>
+            <label>
+              数据源
+              <select name="dataSource">
+                <option value="akshare">akshare (A股)</option>
+                <option value="tencent" selected>腾讯行情 (A股)</option>
+                <option value="yahoo">Yahoo Finance</option>
+              </select>
+            </label>
+            <label>
+              复权方式 (A股数据源)
+              <select name="akshareAdjust">
+                <option value="qfq" selected>前复权</option>
+                <option value="hfq">后复权</option>
+                <option value="none">不复权</option>
+              </select>
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" name="autoAdjust" checked />
+              使用 Yahoo 调整收盘价
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit" id="submit-btn">运行回测</button>
+            <span class="status" id="status-text"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>关键指标</h2>
+        <div id="metrics-grid" class="metrics-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-card">
+          <h3>收益曲线</h3>
+          <canvas id="equity-chart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-card">
+          <h3>日收益率</h3>
+          <canvas id="returns-chart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="chart-card">
+          <h3>K线走势</h3>
+          <canvas id="ohlc-chart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>原始数据 (末尾)</h2>
+        <table id="tail-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>收盘价</th>
+              <th>仓位</th>
+              <th>持仓价</th>
+              <th>日收益率</th>
+              <th>总收益率</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="table-pagination">
+          <button type="button" id="prev-page" disabled>上一页</button>
+          <span id="pagination-info">第 0 / 0 页</span>
+          <button type="button" id="next-page" disabled>下一页</button>
+        </div>
+      </section>
+    </main>
+
+    <template id="metric-item-template">
+      <div class="metric-item">
+        <span class="metric-label"></span>
+        <span class="metric-value"></span>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
