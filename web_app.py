@@ -84,6 +84,17 @@ def api_backtest() -> Any:
     akshare_adjust = payload.get("akshareAdjust", "qfq")
     max_retries = int(payload.get("maxRetries", 3))
     retry_delay = float(payload.get("retryDelay", 5.0))
+    use_macd = bool(payload.get("useMacd", False))
+    macd_fast = int(payload.get("macdFast", 12))
+    macd_slow = int(payload.get("macdSlow", 26))
+    macd_signal = int(payload.get("macdSignal", 9))
+    use_kdj = bool(payload.get("useKdj", False))
+    kdj_window = int(payload.get("kdjWindow", 9))
+    kdj_smooth_k = int(payload.get("kdjSmoothK", 3))
+    kdj_smooth_d = int(payload.get("kdjSmoothD", 3))
+    use_rsi = bool(payload.get("useRsi", False))
+    rsi_window = int(payload.get("rsiWindow", 14))
+    rsi_threshold = float(payload.get("rsiThreshold", 50.0))
 
     def _compute() -> Dict[str, Any]:
         data = load_price_data(
@@ -95,8 +106,23 @@ def api_backtest() -> Any:
             max_retries=max_retries,
             retry_delay=retry_delay,
             akshare_adjust=akshare_adjust,
+            macd_fast=macd_fast,
+            macd_slow=macd_slow,
+            macd_signal=macd_signal,
+            rsi_window=rsi_window,
+            kdj_window=kdj_window,
+            kdj_smooth_k=kdj_smooth_k,
+            kdj_smooth_d=kdj_smooth_d,
         )
-        signals = moving_average_strategy(data, short_window, long_window)
+        signals = moving_average_strategy(
+            data,
+            short_window,
+            long_window,
+            use_macd=use_macd,
+            use_kdj=use_kdj,
+            use_rsi=use_rsi,
+            rsi_threshold=rsi_threshold,
+        )
         result = backtest_vectorized(
             data,
             signals,
@@ -121,6 +147,16 @@ def api_backtest() -> Any:
         daily_df["action"] = signal_diff.apply(
             lambda x: "买入" if x > 0 else ("卖出" if x < 0 else "-")
         )
+        if {"macd", "macd_signal", "macd_hist"}.issubset(data.columns):
+            daily_df["macd"] = data["macd"]
+            daily_df["macd_signal"] = data["macd_signal"]
+            daily_df["macd_hist"] = data["macd_hist"]
+        if {"kdj_k", "kdj_d", "kdj_j"}.issubset(data.columns):
+            daily_df["kdj_k"] = data["kdj_k"]
+            daily_df["kdj_d"] = data["kdj_d"]
+            daily_df["kdj_j"] = data["kdj_j"]
+        if "rsi" in data.columns:
+            daily_df["rsi"] = data["rsi"]
 
         close_series = data["close"]
         equity_aligned = equity_curve_series.reindex(data.index).ffill().bfill()
@@ -154,6 +190,13 @@ def api_backtest() -> Any:
                     "action": row["action"],
                     "return": _to_serializable(row["return"]),
                     "totalReturn": _to_serializable(row.get("total_return")),
+                    "macd": _to_serializable(row.get("macd")),
+                    "macdSignal": _to_serializable(row.get("macd_signal")),
+                    "macdHist": _to_serializable(row.get("macd_hist")),
+                    "kdjK": _to_serializable(row.get("kdj_k")),
+                    "kdjD": _to_serializable(row.get("kdj_d")),
+                    "kdjJ": _to_serializable(row.get("kdj_j")),
+                    "rsi": _to_serializable(row.get("rsi")),
                 }
             )
         tail_df = daily_df.tail(10)
@@ -170,6 +213,13 @@ def api_backtest() -> Any:
                     "action": row["action"],
                     "return": _to_serializable(row["return"]),
                     "totalReturn": _to_serializable(row.get("total_return")),
+                    "macd": _to_serializable(row.get("macd")),
+                    "macdSignal": _to_serializable(row.get("macd_signal")),
+                    "macdHist": _to_serializable(row.get("macd_hist")),
+                    "kdjK": _to_serializable(row.get("kdj_k")),
+                    "kdjD": _to_serializable(row.get("kdj_d")),
+                    "kdjJ": _to_serializable(row.get("kdj_j")),
+                    "rsi": _to_serializable(row.get("rsi")),
                 }
             )
 
@@ -200,6 +250,17 @@ def api_backtest() -> Any:
                 "dataSource": data_source,
                 "autoAdjust": auto_adjust,
                 "akshareAdjust": akshare_adjust,
+                "useMacd": use_macd,
+                "macdFast": macd_fast,
+                "macdSlow": macd_slow,
+                "macdSignal": macd_signal,
+                "useKdj": use_kdj,
+                "kdjWindow": kdj_window,
+                "kdjSmoothK": kdj_smooth_k,
+                "kdjSmoothD": kdj_smooth_d,
+                "useRsi": use_rsi,
+                "rsiWindow": rsi_window,
+                "rsiThreshold": rsi_threshold,
             },
             "metrics": metrics,
             "equityCurve": equity_curve,

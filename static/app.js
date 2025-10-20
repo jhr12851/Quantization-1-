@@ -228,6 +228,35 @@ function overrideDateAdapter() {
   Chart._adapters._date.override(adapter);
 }
 
+function handleChartPanKeydown(event) {
+  const step = event.shiftKey ? 120 : 60;
+  let handled = false;
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    const direction = event.key === "ArrowLeft" ? step : -step;
+    if (isEquityChartFocused && equityChart && typeof equityChart.pan === "function") {
+      equityChart.pan({ x: direction, y: 0 }, undefined, "none");
+      handled = true;
+    } else if (isOhlcChartFocused && ohlcChart && typeof ohlcChart.pan === "function") {
+      ohlcChart.pan({ x: direction, y: 0 }, undefined, "none");
+      handled = true;
+    }
+  }
+  if (handled) {
+    event.preventDefault();
+  }
+}
+
+function refreshKeyboardPanBinding() {
+  const shouldBind = isEquityChartFocused || isOhlcChartFocused;
+  if (shouldBind && !documentKeydownHandler) {
+    documentKeydownHandler = handleChartPanKeydown;
+    document.addEventListener("keydown", documentKeydownHandler);
+  } else if (!shouldBind && documentKeydownHandler) {
+    document.removeEventListener("keydown", documentKeydownHandler);
+    documentKeydownHandler = null;
+  }
+}
+
 overrideDateAdapter();
 
 if (typeof Chart !== "undefined" && typeof Chart.register === "function" && typeof window.ChartZoom !== "undefined") {
@@ -252,26 +281,19 @@ function setEquityChartFocus(enabled) {
   }
 
   if (enabled) {
-    if (!documentKeydownHandler) {
-      documentKeydownHandler = (event) => {
-        if (!isEquityChartFocused || !equityChart || typeof equityChart.pan !== "function") {
-          return;
-        }
-        const step = event.shiftKey ? 120 : 60;
-        if (event.key === "ArrowLeft") {
-          event.preventDefault();
-          equityChart.pan({ x: step, y: 0 }, undefined, "none");
-        } else if (event.key === "ArrowRight") {
-          event.preventDefault();
-          equityChart.pan({ x: -step, y: 0 }, undefined, "none");
-        }
-      };
-      document.addEventListener("keydown", documentKeydownHandler);
+    if (ohlcChart && ohlcChart.options?.plugins?.zoom) {
+      const zoomOptions = ohlcChart.options.plugins.zoom;
+      if (zoomOptions.zoom?.wheel) {
+        zoomOptions.zoom.wheel.enabled = false;
+      }
+      if (zoomOptions.pan) {
+        zoomOptions.pan.enabled = false;
+      }
+      ohlcChart.update("none");
     }
-  } else if (documentKeydownHandler) {
-    document.removeEventListener("keydown", documentKeydownHandler);
-    documentKeydownHandler = null;
+    isOhlcChartFocused = false;
   }
+  refreshKeyboardPanBinding();
 }
 
 function setOhlcChartFocus(enabled) {
@@ -290,6 +312,10 @@ function setOhlcChartFocus(enabled) {
   if (card) {
     card.classList.toggle("chart-focused", enabled);
   }
+  if (enabled) {
+    setEquityChartFocus(false);
+  }
+  refreshKeyboardPanBinding();
 }
 
 function attachEquityFocusHandlers() {
@@ -299,6 +325,7 @@ function attachEquityFocusHandlers() {
   }
   if (!equityCanvasDownHandler) {
     equityCanvasDownHandler = () => {
+      setOhlcChartFocus(false);
       setEquityChartFocus(true);
     };
     canvas.addEventListener("pointerdown", equityCanvasDownHandler);
@@ -328,6 +355,7 @@ function attachOhlcFocusHandlers() {
   }
   if (!ohlcCanvasDownHandler) {
     ohlcCanvasDownHandler = () => {
+      setEquityChartFocus(false);
       setOhlcChartFocus(true);
     };
     canvas.addEventListener("pointerdown", ohlcCanvasDownHandler);
@@ -729,7 +757,7 @@ function renderDailyTable() {
   tailTableBody.innerHTML = "";
   if (!dailyRecords.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7" style="text-align:center;color:var(--muted);">暂无数据</td>';
+    tr.innerHTML = '<td colspan="12" style="text-align:center;color:var(--muted);">暂无数据</td>';
     tailTableBody.appendChild(tr);
     paginationInfo.textContent = "第 0 / 0 页";
     prevPageBtn.disabled = true;
@@ -748,6 +776,11 @@ function renderDailyTable() {
     const position = formatNumber(row.position, 2);
     const holdingPrice = formatPrice(row.holdingPrice);
     const totalReturn = formatPercent(row.totalReturn);
+    const macd = formatNumber(row.macd, 2);
+    const macdSignal = formatNumber(row.macdSignal, 2);
+    const kdjK = formatNumber(row.kdjK, 2);
+    const kdjD = formatNumber(row.kdjD, 2);
+    const rsi = formatNumber(row.rsi, 2);
     tr.innerHTML = `
       <td>${row.date}</td>
       <td>${price}</td>
@@ -756,6 +789,11 @@ function renderDailyTable() {
       <td>${formatPercent(row.return)}</td>
       <td>${totalReturn}</td>
       <td>${row.action || "-"}</td>
+      <td>${macd}</td>
+      <td>${macdSignal}</td>
+      <td>${kdjK}</td>
+      <td>${kdjD}</td>
+      <td>${rsi}</td>
     `;
     tailTableBody.appendChild(tr);
   });
@@ -783,6 +821,17 @@ async function runBacktest(event) {
     dataSource: formData.get("dataSource"),
     akshareAdjust: formData.get("akshareAdjust"),
     autoAdjust: formData.get("autoAdjust") !== null,
+    useMacd: formData.get("useMacd") !== null,
+    macdFast: Number(formData.get("macdFast") || 12),
+    macdSlow: Number(formData.get("macdSlow") || 26),
+    macdSignal: Number(formData.get("macdSignal") || 9),
+    useKdj: formData.get("useKdj") !== null,
+    kdjWindow: Number(formData.get("kdjWindow") || 9),
+    kdjSmoothK: Number(formData.get("kdjSmoothK") || 3),
+    kdjSmoothD: Number(formData.get("kdjSmoothD") || 3),
+    useRsi: formData.get("useRsi") !== null,
+    rsiWindow: Number(formData.get("rsiWindow") || 14),
+    rsiThreshold: Number(formData.get("rsiThreshold") || 50),
   };
 
   const timeoutMs = 45000;

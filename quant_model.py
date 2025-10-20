@@ -46,6 +46,48 @@ def _format_tencent_symbol(ticker: str) -> str:
     return f"{prefix}{clean}"
 
 
+def compute_macd(
+    prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9
+) -> pd.DataFrame:
+    ema_fast = prices.ewm(span=fast, adjust=False).mean()
+    ema_slow = prices.ewm(span=slow, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    macd_signal = macd.ewm(span=signal, adjust=False).mean()
+    macd_hist = macd - macd_signal
+    return pd.DataFrame(
+        {"macd": macd, "macd_signal": macd_signal, "macd_hist": macd_hist}
+    )
+
+
+def compute_rsi(prices: pd.Series, window: int = 14) -> pd.Series:
+    delta = prices.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(alpha=1 / window, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / window, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi.fillna(50.0)
+
+
+def compute_kdj(
+    high: pd.Series,
+    low: pd.Series,
+    close: pd.Series,
+    window: int = 9,
+    smooth_k: int = 3,
+    smooth_d: int = 3,
+) -> pd.DataFrame:
+    lowest_low = low.rolling(window=window, min_periods=1).min()
+    highest_high = high.rolling(window=window, min_periods=1).max()
+    denom = (highest_high - lowest_low).replace(0, np.nan)
+    rsv = ((close - lowest_low) / denom * 100).fillna(0)
+    k = rsv.ewm(alpha=1 / smooth_k, adjust=False).mean()
+    d = k.ewm(alpha=1 / smooth_d, adjust=False).mean()
+    j = 3 * k - 2 * d
+    return pd.DataFrame({"kdj_k": k, "kdj_d": d, "kdj_j": j})
+
+
 def load_price_data(
     ticker: str,
     start: Optional[str],
@@ -56,6 +98,13 @@ def load_price_data(
     max_retries: int = 3,
     retry_delay: float = 5.0,
     akshare_adjust: str = "qfq",
+    macd_fast: int = 12,
+    macd_slow: int = 26,
+    macd_signal: int = 9,
+    rsi_window: int = 14,
+    kdj_window: int = 9,
+    kdj_smooth_k: int = 3,
+    kdj_smooth_d: int = 3,
 ) -> pd.DataFrame:
     start_dt = _parse_date(start)
     end_dt = _parse_date(end)
@@ -106,6 +155,19 @@ def load_price_data(
         )
         data.index.name = "date"
         data = data.sort_index()
+        indicators = [
+            compute_macd(data["close"], macd_fast, macd_slow, macd_signal),
+            compute_rsi(data["close"], rsi_window).rename("rsi"),
+            compute_kdj(
+                data["high"],
+                data["low"],
+                data["close"],
+                kdj_window,
+                kdj_smooth_k,
+                kdj_smooth_d,
+            ),
+        ]
+        data = pd.concat([data, *indicators], axis=1)
         return data
 
     if source == "akshare":
@@ -146,6 +208,19 @@ def load_price_data(
         data = data[["open", "high", "low", "close", "volume"]].apply(pd.to_numeric)
         data["adj_close"] = data["close"]
         data = data.sort_index()
+        indicators = [
+            compute_macd(data["close"], macd_fast, macd_slow, macd_signal),
+            compute_rsi(data["close"], rsi_window).rename("rsi"),
+            compute_kdj(
+                data["high"],
+                data["low"],
+                data["close"],
+                kdj_window,
+                kdj_smooth_k,
+                kdj_smooth_d,
+            ),
+        ]
+        data = pd.concat([data, *indicators], axis=1)
         return data
 
     if source == "tencent":
@@ -247,6 +322,19 @@ def load_price_data(
         data = data.loc[(data.index >= start_dt) & (data.index <= end_dt)]
         if data.empty:
             raise ValueError(f"No price data downloaded for {ticker} from Tencent.")
+        indicators = [
+            compute_macd(data["close"], macd_fast, macd_slow, macd_signal),
+            compute_rsi(data["close"], rsi_window).rename("rsi"),
+            compute_kdj(
+                data["high"],
+                data["low"],
+                data["close"],
+                kdj_window,
+                kdj_smooth_k,
+                kdj_smooth_d,
+            ),
+        ]
+        data = pd.concat([data, *indicators], axis=1)
         return data
 
     raise ValueError(
@@ -255,7 +343,14 @@ def load_price_data(
 
 
 def moving_average_strategy(
-    data: pd.DataFrame, short_window: int, long_window: int
+    data: pd.DataFrame,
+    short_window: int,
+    long_window: int,
+    *,
+    use_macd: bool = False,
+    use_kdj: bool = False,
+    use_rsi: bool = False,
+    rsi_threshold: float = 50.0,
 ) -> pd.Series:
     if short_window >= long_window:
         raise ValueError("short_window must be less than long_window")
@@ -268,6 +363,28 @@ def moving_average_strategy(
     signal[short_ma > long_ma] = 1.0
     signal[short_ma <= long_ma] = 0.0
     signal = signal.ffill().fillna(0.0)
+
+    if use_macd:
+        if {"macd", "macd_signal"}.issubset(data.columns):
+            confirmation = data["macd"] > data["macd_signal"]
+            signal = signal.where(confirmation, 0.0)
+        else:
+            raise ValueError("MACD columns are missing from the price data.")
+
+    if use_kdj:
+        if {"kdj_k", "kdj_d"}.issubset(data.columns):
+            confirmation = data["kdj_k"] > data["kdj_d"]
+            signal = signal.where(confirmation, 0.0)
+        else:
+            raise ValueError("KDJ columns are missing from the price data.")
+
+    if use_rsi:
+        if "rsi" in data.columns:
+            confirmation = data["rsi"] > rsi_threshold
+            signal = signal.where(confirmation, 0.0)
+        else:
+            raise ValueError("RSI column is missing from the price data.")
+
     return signal
 
 
@@ -443,6 +560,69 @@ def parse_args() -> argparse.Namespace:
         default="qfq",
         help="A股数据源复权方式: qfq(前复权)/hfq(后复权)/none(不复权)",
     )
+    parser.add_argument(
+        "--use-macd",
+        action="store_true",
+        help="Require MACD line above signal line as additional long confirmation",
+    )
+    parser.add_argument(
+        "--macd-fast",
+        type=int,
+        default=12,
+        help="MACD fast EMA period",
+    )
+    parser.add_argument(
+        "--macd-slow",
+        type=int,
+        default=26,
+        help="MACD slow EMA period",
+    )
+    parser.add_argument(
+        "--macd-signal",
+        type=int,
+        default=9,
+        help="MACD signal EMA period",
+    )
+    parser.add_argument(
+        "--use-kdj",
+        action="store_true",
+        help="Require KDJ K line above D line",
+    )
+    parser.add_argument(
+        "--kdj-window",
+        type=int,
+        default=9,
+        help="KDJ RSV window",
+    )
+    parser.add_argument(
+        "--kdj-smooth-k",
+        type=int,
+        default=3,
+        help="KDJ K line smoothing factor",
+    )
+    parser.add_argument(
+        "--kdj-smooth-d",
+        type=int,
+        default=3,
+        help="KDJ D line smoothing factor",
+    )
+    parser.add_argument(
+        "--use-rsi",
+        action="store_true",
+        help="Require RSI above threshold",
+    )
+    parser.add_argument(
+        "--rsi-window",
+        type=int,
+        default=14,
+        help="RSI calculation window",
+    )
+    parser.add_argument(
+        "--rsi-threshold",
+        type=float,
+        default=50.0,
+        help="RSI threshold for long confirmation",
+    )
     return parser.parse_args()
 
 
@@ -458,8 +638,23 @@ def main() -> None:
         max_retries=args.max_retries,
         retry_delay=args.retry_delay,
         akshare_adjust=args.akshare_adjust,
+        macd_fast=args.macd_fast,
+        macd_slow=args.macd_slow,
+        macd_signal=args.macd_signal,
+        rsi_window=args.rsi_window,
+        kdj_window=args.kdj_window,
+        kdj_smooth_k=args.kdj_smooth_k,
+        kdj_smooth_d=args.kdj_smooth_d,
     )
-    signals = moving_average_strategy(data, args.short_window, args.long_window)
+    signals = moving_average_strategy(
+        data,
+        args.short_window,
+        args.long_window,
+        use_macd=args.use_macd,
+        use_kdj=args.use_kdj,
+        use_rsi=args.use_rsi,
+        rsi_threshold=args.rsi_threshold,
+    )
     result = backtest_vectorized(
         data,
         signals,
