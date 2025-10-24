@@ -225,6 +225,14 @@ button[type="submit"]:disabled {
   background: var(--accent-light);
 }
 
+#jump-page {
+  width: 60px;
+  margin: 0 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
 @media (max-width: 768px) {
   header {
     padding: 2rem 1rem 1rem;

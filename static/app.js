@@ -7,6 +7,8 @@ const tailTableBody = document.querySelector("#tail-table tbody");
 const paginationInfo = document.getElementById("pagination-info");
 const prevPageBtn = document.getElementById("prev-page");
 const nextPageBtn = document.getElementById("next-page");
+const jumpPageInput = document.getElementById("jump-page");
+const jumpButton = document.getElementById("jump-button");
 
 const equityCtx = document.getElementById("equity-chart").getContext("2d");
 const returnsCtx = document.getElementById("returns-chart").getContext("2d");
@@ -757,7 +759,7 @@ function renderDailyTable() {
   tailTableBody.innerHTML = "";
   if (!dailyRecords.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="12" style="text-align:center;color:var(--muted);">暂无数据</td>';
+    tr.innerHTML = '<td colspan="13" style="text-align:center;color:var(--muted);">暂无数据</td>';
     tailTableBody.appendChild(tr);
     paginationInfo.textContent = "第 0 / 0 页";
     prevPageBtn.disabled = true;
@@ -781,6 +783,7 @@ function renderDailyTable() {
     const kdjK = formatNumber(row.kdjK, 2);
     const kdjD = formatNumber(row.kdjD, 2);
     const rsi = formatNumber(row.rsi, 2);
+    const risk = row.riskReduced ? "是" : "-";
     tr.innerHTML = `
       <td>${row.date}</td>
       <td>${price}</td>
@@ -794,6 +797,7 @@ function renderDailyTable() {
       <td>${kdjK}</td>
       <td>${kdjD}</td>
       <td>${rsi}</td>
+      <td>${risk}</td>
     `;
     tailTableBody.appendChild(tr);
   });
@@ -801,6 +805,10 @@ function renderDailyTable() {
   paginationInfo.textContent = `第 ${currentPage} / ${totalPages} 页（共 ${dailyRecords.length} 条）`;
   prevPageBtn.disabled = currentPage === 1;
   nextPageBtn.disabled = currentPage === totalPages;
+  if (jumpPageInput) {
+    jumpPageInput.value = String(currentPage);
+    jumpPageInput.max = String(totalPages);
+  }
 }
 
 async function runBacktest(event) {
@@ -892,6 +900,20 @@ function changePage(delta) {
 
 prevPageBtn.addEventListener("click", () => changePage(-1));
 nextPageBtn.addEventListener("click", () => changePage(1));
+if (jumpButton) {
+  jumpButton.addEventListener("click", () => {
+    if (!dailyRecords.length) {
+      return;
+    }
+    const totalPages = Math.ceil(dailyRecords.length / PAGE_SIZE);
+    const target = Number(jumpPageInput.value || 1);
+    const nextPage = Math.min(Math.max(Math.floor(target), 1), totalPages);
+    if (nextPage !== currentPage) {
+      currentPage = nextPage;
+      renderDailyTable();
+    }
+  });
+}
 
 statusText.textContent = "填写参数后点击“运行回测”。";
 renderDailyTable();

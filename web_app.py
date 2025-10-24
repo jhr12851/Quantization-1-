@@ -177,6 +177,7 @@ def api_backtest() -> Any:
         holding_series = pd.Series(holding_values, index=data.index)
         daily_df["holding_price"] = holding_series
         daily_df["total_return"] = total_return_series
+        daily_df["risk_reduced"] = result.risk_flags
         daily_data = []
         for idx, row in daily_df.iterrows():
             holding_raw = row.get("holding_price")
@@ -197,6 +198,7 @@ def api_backtest() -> Any:
                     "kdjD": _to_serializable(row.get("kdj_d")),
                     "kdjJ": _to_serializable(row.get("kdj_j")),
                     "rsi": _to_serializable(row.get("rsi")),
+                    "riskReduced": bool(row.get("risk_reduced", False)),
                 }
             )
         tail_df = daily_df.tail(10)
@@ -220,6 +222,7 @@ def api_backtest() -> Any:
                     "kdjD": _to_serializable(row.get("kdj_d")),
                     "kdjJ": _to_serializable(row.get("kdj_j")),
                     "rsi": _to_serializable(row.get("rsi")),
+                    "riskReduced": bool(row.get("risk_reduced", False)),
                 }
             )
 

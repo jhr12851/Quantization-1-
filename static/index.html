@@ -164,6 +164,7 @@
               <th>K</th>
               <th>D</th>
               <th>RSI</th>
+              <th>风控减仓</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -172,6 +173,12 @@
           <button type="button" id="prev-page" disabled>上一页</button>
           <span id="pagination-info">第 0 / 0 页</span>
           <button type="button" id="next-page" disabled>下一页</button>
+          <span>
+            跳转到
+            <input type="number" id="jump-page" min="1" value="1" />
+            页
+            <button type="button" id="jump-button">跳转</button>
+          </span>
         </div>
       </section>
     </main>

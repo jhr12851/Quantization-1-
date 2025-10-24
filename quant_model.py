@@ -395,6 +395,7 @@ class BacktestResult:
     positions: pd.Series
     trades: pd.Series
     metrics: dict[str, float]
+    risk_flags: pd.Series
 
 
 def backtest_vectorized(
@@ -409,10 +410,12 @@ def backtest_vectorized(
     close = data["close"]
     daily_rets = close.pct_change().fillna(0.0)
 
-    positions = signals.shift(1).fillna(0.0)
-    strategy_rets = positions * daily_rets
+    base_positions = signals.shift(1).fillna(0.0)
+    drawdown_mask = (daily_rets <= -0.05) & (base_positions > 0)
+    positions = base_positions.where(~drawdown_mask, base_positions * 0.5)
 
-    trade_diff = signals.diff().fillna(0.0).abs()
+    strategy_rets = positions * daily_rets
+    trade_diff = positions.diff().fillna(positions).abs()
     trading_cost = trade_diff * (trading_cost_bps / 10_000.0)
     net_rets = strategy_rets - trading_cost
 
@@ -427,6 +430,7 @@ def backtest_vectorized(
         positions=positions,
         trades=trades,
         metrics=metrics,
+        risk_flags=drawdown_mask,
     )
 
 
